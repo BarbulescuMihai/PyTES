@@ -6,7 +6,6 @@ Created on Sat Jan 7 18:03:02 2017
 """
 
 import scipy as sc
-import mpmath as mp
 
 """
 We define
@@ -18,7 +17,7 @@ K = k x_0
 W = omega/v_A
 """
 
-class Asym_slab:
+class Asymmetric_slab:
 
     def __init__(self, c0, R1, R2, K, M_A):
         self.c0 = c0
@@ -45,18 +44,3 @@ class Asym_slab:
         return self.m0(W, M_A)**2 * W**4 + 1/self.R1 * 1/self.R2 * self.m1(W) * self.m2(W) * (1 - (W - M_A)**2)**2 - \
 	           0.5 * W**2 * self.m0(W, M_A) * (1 - (W - M_A)**2) * (1/self.R1 * self.m1(W) + 1/self.R2 * self.m2(W)) * \
 	           (sc.tanh(self.m0(W, M_A) * K) + sc.tanh(self.m0(W, M_A) * K)**(-1))
-
-    def m1_mp(self, W):
-        return mp.sqrt(1 - W**2 / self.c1**2)
-
-    def m2_mp(self, W):
-        return mp.sqrt(1 - W**2 / self.c2**2)
-
-    def m0_mp(self, W, M_A):
-        return mp.sqrt((1 - (W - M_A)**2) * (self.c0**2 - (W - M_A)**2) /
-	                      ((1 + self.c0**2) * (self.cT**2 - (W - M_A)**2)))
-
-    def disp_rel_mp(self, W, K, M_A):
-        return self.m0_mp(W, M_A)**2 * W**4 + 1/self.R1 * 1/self.R2 * self.m1_mp(W) * self.m2_mp(W) * (1 - (W - M_A)**2)**2 - \
-	           0.5 * W**2 * self.m0_mp(W, M_A) * (1 - (W - M_A)**2) * (1/self.R1 * self.m1_mp(W) + 1/self.R2 * self.m2_mp(W)) * \
-	           (mp.tanh(self.m0_mp(W, M_A) * K) + mp.tanh(self.m0_mp(W, M_A) * K)**(-1))
