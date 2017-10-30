@@ -3,6 +3,7 @@ import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
 import timeit
+from numbers import Number
 
 def grid_solver(func,
                 x_range, y_range,
@@ -19,7 +20,15 @@ def grid_solver(func,
 
         for x_loc in x_range:
 
-            arguments = [x_loc if i is None else i for i in list(args)]
+            if type(args)==tuple:
+                arguments = [x_loc if i is None else i for i in np.array(args)]
+            elif isinstance(x_range[2], Number):
+                arguments = [x_loc]
+            else:
+                print('Invalid arguments.\
+                      \nWas expecting number or tuple.\
+                      \nInstead received {}'.format(type(args)))
+                break
 
             for y_loc in y_range:
                 try:
@@ -39,7 +48,15 @@ def grid_solver(func,
 
         for x_loc in x_range:
 
-            arguments = [x_loc if i is None else i for i in list(args)]
+            if type(args)==tuple:
+                arguments = [x_loc if i is None else i for i in np.array(args)]
+            elif isinstance(x_range[2], Number):
+                arguments = [x_loc]
+            else:
+                print('Invalid arguments.\
+                      \nWas expecting number or tuple.\
+                      \nInstead received {}'.format(type(args)))
+                break
 
             for y_loc in y_range:
 
@@ -75,7 +92,15 @@ def grid_solver(func,
 
         for x_loc in x_range:
 
-            arguments = [x_loc if i is None else i for i in list(args)]
+            if type(args)==tuple:
+                arguments = [x_loc if i is None else i for i in np.array(args)]
+            elif isinstance(x_range[2], Number):
+                arguments = [x_loc]
+            else:
+                print('Invalid arguments.\
+                      \nWas expecting number or tuple.\
+                      \nInstead received {}'.format(type(args)))
+                break
 
             for y_loc in y_range:
 
