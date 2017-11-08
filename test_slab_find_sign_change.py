@@ -4,18 +4,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import main as pytes
 
-slab = Asymmetric_slab(c0=0.6, R1=1.25, R2=1.25, K=None, M_A=0)
+slab = Asymmetric_slab(R1=1.25, R2=1.25, kx0=None, c0=0.6, M_A=0)
 
-x_range = np.linspace(0, 2, 101)
-y_range = np.linspace(-1, 1, 1001)
+x_range = np.linspace(0, 2, 1000)
+y_range = np.linspace(0, 1, 1000)
 
-root_locs, roots = pytes.find_sign_change(slab.disp_rel, x_range, y_range,
-                                          args=slab.M_A)
+axes = {'x_axis':'kx0', 'y_axis':'vph'}
+args = {'M_A':slab.M_A}
+
+points = pytes.find_sign_change(slab.disp_rel, x_range, y_range, axes, args)
 
 ax = plt.subplot()
 
-ax.plot(root_locs, roots, 'b.')
-ax.plot(root_locs, np.imag(roots), 'r.')
+ax.plot(points[:, 0], points[:, 1], 'b,')
 
 ax.set_xlim(x_range[0], x_range[-1])
 ax.set_ylim(y_range[0], y_range[-1])
