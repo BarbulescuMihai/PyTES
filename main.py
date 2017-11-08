@@ -8,12 +8,7 @@ import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
 
-def grid_solver(func,
-                x_range,
-                y_range,
-                axes,
-                args,
-                method='sp.newton'):
+def grid_solver(func, x_range, y_range, axes, args, method='sp.newton'):
     """
     Finds the roots of func in a box defined by x_range and y_range.
 
