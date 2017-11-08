@@ -195,22 +195,72 @@ def grid_solver(func,
 
     return points
 
-def find_sign_change(func, x_range, y_range, args=(None)):
-    """"
-    Not really functional. Needs argument system implemented.
+def find_sign_change(func, x_range, y_range, axes, args):
+    """
+    Finds the points where the value of func changes sign in a box defined by x_range and y_range.
+    The purpose of this function is to find points where there might be roots of func.
+
+    Parameters
+    ----------
+        func: function
+            A function of an arbitrary number of variables.
+        x_range: array_like
+            An array defining the x-axis.
+        y_range: array_like
+            An array defining the y-axis.
+        axes: dictionary
+            Specify which axis corresponds to which variable in func.
+            This must have the form {'x_axis':'var1', 'y_axis':var2}, where var1 and var2 are
+            arguments of func.
+        args: dictionary
+            Specify any other arguments of func as keys and their corresponding values.
+            These must be entered as {'key1':value1, 'key2':value2, etc.}
+
+    Returns
+    -------
+        points: array_like
+            A 2 column numpy array.
+            The entries in column 0 are points on the x-axis.
+            The entries in column 1 are points on the y-axis.
     """
 
+    start_time = timeit.default_timer()
+
     x_grid, y_grid = np.meshgrid(x_range, y_range)
-    func_grid = func(y_grid, x_grid, args)
+
+    func_part = partial(func, **args)
+
+    grid_axes = {}
+
+    grid_axes[axes['y_axis']] = y_grid
+    grid_axes[axes['x_axis']] = x_grid
+
+    func_grid = func_part(**grid_axes, **args)
 
     grid_shift_up = func_grid[1:, :]
     grid_shift_down = func_grid[:-1, :]
     grid_prod = np.real(grid_shift_down) * np.real(grid_shift_up)
 
-    root_locs = x_grid[(grid_prod < 0) * (func_grid[:-1, :] < 10)]
-    roots = y_grid[(grid_prod < 0) * (func_grid[:-1, :] < 10)]
+    root_locs = x_grid[1:][(grid_prod < 0) * (func_grid[:-1, :] < 10)]
+    roots = y_grid[1:][(grid_prod < 0) * (func_grid[:-1, :] < 10)]
 
-    return root_locs, roots
+    points = np.swapaxes(np.vstack((root_locs, roots)), 1, 0)
+
+    end_time = timeit.default_timer()
+    running_time = end_time - start_time
+
+    print('\n' + '='*60 + '\n',
+          '\nFinished finding the sign changes in the function.\
+          \nThe total running time was {:.6f}s.\
+          \nA total of {} points were found in the {}x{} grid.\n'
+          .format(running_time,
+                  len(roots),
+                  len(x_range), len(y_range)
+                 ),
+          '\n' + '='*60 + '\n'
+         )
+
+    return points
 
 def find_first_imag(func, x_range, y_range, args=(None)):
     """
