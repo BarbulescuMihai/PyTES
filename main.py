@@ -12,7 +12,7 @@ import mpmath as mp
 
 def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
     """
-    Finds the roots of func in a box defined by x_range and y_range.
+    Finds the roots of func in a box defined by x_range and y_range using an assigned method.
 
     Parameters
     ----------
@@ -24,7 +24,7 @@ def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
             An array defining the y-axis.
         axes: dictionary
             Specify which axis corresponds to which variable in func.
-            This must have the form {'x_axis':'var1', 'y_axis':var2}, where var1 and var2 are
+            This must have the form {'x_axis':'var1', 'y_axis':'var2'}, where var1 and var2 are
             arguments of func.
         kwargs: dictionary
             Specify any other arguments of func as keys and their corresponding values.
@@ -36,7 +36,7 @@ def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
     Returns
     -------
         points: array_like
-            A 2 column numpy array.
+            A nx2 numpy array, where n is the number of roots found.
             The entries in column 0 are points on the x-axis.
             The entries in column 1 are points on the y-axis.
     """
@@ -47,116 +47,15 @@ def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
 
     if method == 'sp.newton':
 
-        for x_loc in x_range:
-
-            #Adds x_loc in kwargs and assigns it to the variable corresponding to x_axis.
-            #Creates a partial function using all the extra arguments.
-            #The partial function now only depends on the variable assigned to y_axis.
-            kwargs[axes['x_axis']] = x_loc
-            func_part = partial(func, **kwargs)
-
-            for y_loc in y_range:
-                try:
-                    #Attempts to find a root of the function for the specified y_loc.
-                    root = sp.newton(func_part, y_loc, tol=1e-20)
-
-                    #Makes sure that the root found is within y_range.
-                    #If it is within 1e-6 of any other root it is discarded.
-                    #If the imaginary part is less than 1e-5 it is discarded.
-                    if (root > y_range[0] and root < y_range[-1]) \
-                    and not np.isclose(root, points, atol=1e-6).any():
-
-                        if np.imag(root) != 0 and np.imag(root) < 1e-5:
-                            root = np.real(root)
-
-                        points.append([x_loc, root])
-
-                    #If a root is not found, the method returns returns a RuntimeError.
-                    #The function then passes to the next value of y_loc.
-                except RuntimeError:
-                    pass
+        points = grid_solver_spnewton(func, x_range, y_range, axes, kwargs)
 
     if method == 'sp.brentq':
-        #Much like the bisection method, Brent's method requires an interval in which the function
-        #we are trying to find the root of changes sign.
-        #This method first finds such an interval, then uses sp.brentq to find the real root.
-        #This method cannot find complex roots.
 
-        #Half the stepsize used in y_range.
-        step_size = np.abs(y_range[0]-y_range[-1])/(2*len(y_range))
-
-        for x_loc in x_range:
-
-            #Same as sp.newton. Refer to that for comments.
-            kwargs[axes['x_axis']] = x_loc
-            func_part = partial(func, **kwargs)
-
-            for y_loc in y_range:
-
-                #Refer to find_sign_change for comments.
-                y_range_local = np.linspace(y_loc-step_size, y_loc+step_size, 10000)
-                root_locs = find_sign_change(func_part, y_range_local)
-
-                for i in np.where(root_locs)[0]:
-
-                    #Assign the end-points of the interval used in sp.brentq.
-                    brent_start = y_range_local[i-2]
-                    brent_end = y_range_local[i+2]
-
-                    try:
-                        #This section is similar to sp.newton. Refer to that for comments.
-
-                        root = sp.brentq(func_part, brent_start, brent_end,
-                                         xtol=1e-5, rtol=1e-5, maxiter=200)
-
-                        if (root > y_range[0] and root < y_range[-1]) \
-                        and not np.isclose(root, points, atol=1e-6).any():
-                            
-                            if np.imag(root) != 0 and np.imag(root) < 1e-5:
-                                root = np.real(root)
-
-                            points.append([x_loc, root])
-
-                    except (RuntimeError, ValueError):
-                        pass
+        points = grid_solver_spbrentq(func, x_range, y_range, axes, kwargs)
 
     if method == 'sp.brenth':
-        #This method is analogous to sp.brentq. Refer to that for comments.
 
-        step_size = np.abs(y_range[0]-y_range[-1])/(2*len(y_range))
-
-        for x_loc in x_range:
-
-            kwargs[axes['x_axis']] = x_loc
-            func_part = partial(func, **kwargs)
-
-            for y_loc in y_range:
-
-                y_range_local = np.linspace(y_loc-step_size, y_loc+step_size, 10000)
-                root_locs = find_sign_change(func_part, y_range_local)
-
-                for i in np.where(root_locs)[0]:
-
-                    brent_start = y_range_local[i-2]
-                    brent_end = y_range_local[i+2]
-
-                    try:
-
-                        root = sp.brentq(func_part, brent_start, brent_end,
-                                         xtol=1e-5, rtol=1e-5, maxiter=200)
-
-                        if (root > y_range[0] and root < y_range[-1]) \
-                        and not np.isclose(root, points, atol=1e-6).any():
-                            
-                            if np.imag(root) != 0 and np.imag(root) < 1e-5:
-                                root = np.real(root)
-
-                            points.append([x_loc, root])
-
-                    except (RuntimeError, ValueError):
-                        pass
-
-    points = np.array(points)
+        points = grid_solver_spbrenth(func, x_range, y_range, axes, kwargs)
 
     end_time = timeit.default_timer()
     running_time = end_time - start_time
@@ -176,7 +75,211 @@ def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
 
     return points
 
-def find_sign_change(func, interval, singularity_tol = 1):
+def grid_solver_spnewton(func, x_range, y_range, axes, kwargs):
+    """
+    Finds the roots of func in a box defined by x_range and y_range using Newton's method as
+    defined in scipy.optimize.
+
+    Used in grid_solver. Refer to that for more comments.
+
+    Parameters
+    ----------
+        func: function
+            A function of an arbitrary number of variables.
+        x_range: array_like
+            An array defining the x-axis.
+        y_range: array_like
+            An array defining the y-axis.
+        axes: dictionary
+            Specify which axis corresponds to which variable in func.
+        kwargs: dictionary
+            Specify any other arguments of func as keys and their corresponding values.
+
+    Returns
+    -------
+        points: array_like
+            A nx2 numpy array, where n is the number of roots found.
+    """
+
+    points = []
+
+    for x_loc in x_range:
+
+        #Adds x_loc in kwargs and assigns it to the variable corresponding to x_axis.
+        #Creates a partial function using all the extra arguments.
+        #The partial function now only depends on the variable assigned to y_axis.
+        kwargs[axes['x_axis']] = x_loc
+        func_part = partial(func, **kwargs)
+
+        for y_loc in y_range:
+            try:
+                #Attempts to find a root of the function for the specified y_loc.
+                root = sp.newton(func_part, y_loc, tol=1e-20)
+
+                #Verifies that the root found is within y_range.
+                #If it is within 1e-6 of any other root it is discarded.
+                #If the imaginary part is less than 1e-5 it is discarded.
+                if (root > y_range[0] and root < y_range[-1]) \
+                and not np.isclose(root, points, atol=1e-6).any():
+
+                    if np.imag(root) != 0 and np.imag(root) < 1e-5:
+                        root = np.real(root)
+
+                    points.append([x_loc, root])
+
+                #If a root is not found, the method returns returns a RuntimeError.
+                #Pass to the next value of y_loc.
+            except RuntimeError:
+                pass
+
+    return np.array(points)
+
+def grid_solver_spbrentq(func, x_range, y_range, axes, kwargs):
+    """
+    Finds the roots of func in a box defined by x_range and y_range using Brent's method as
+    defined in scipy.optimize.
+
+    Much like the bisection method, Brent's method requires an interval in which the function
+    changes sign. We use find_sign_change to find changes in sign.
+
+    This method cannot find complex roots.
+
+    Used in grid_solver. Refer to that for more comments.
+
+    Parameters
+    ----------
+        func: function
+            A function of an arbitrary number of variables.
+        x_range: array_like
+            An array defining the x-axis.
+        y_range: array_like
+            An array defining the y-axis.
+        axes: dictionary
+            Specify which axis corresponds to which variable in func.
+        kwargs: dictionary
+            Specify any other arguments of func as keys and their corresponding values.
+
+    Returns
+    -------
+        points: array_like
+            A nx2 numpy array, where n is the number of roots found.
+    """
+
+    points = []
+
+    #Half the stepsize used in y_range.
+    step_size = np.abs(y_range[0]-y_range[-1])/(2*len(y_range))
+
+    for x_loc in x_range:
+
+        #Adds x_loc in kwargs and assigns it to the variable corresponding to x_axis.
+        #Creates a partial function using all the extra arguments.
+        #The partial function now only depends on the variable assigned to y_axis.
+        kwargs[axes['x_axis']] = x_loc
+        func_part = partial(func, **kwargs)
+
+        for y_loc in y_range:
+
+            #Refer to find_sign_change for comments.
+            y_range_local = np.linspace(y_loc-step_size, y_loc+step_size, 10000)
+            root_locs = find_sign_change(func_part, y_range_local)
+
+            for i in np.where(root_locs)[0]:
+
+                #Assign the end-points of the interval used in sp.brentq.
+                brent_start = y_range_local[i-2]
+                brent_end = y_range_local[i+2]
+
+                try:
+
+                    #Attempts to find a root of the function between brent_start and brent_end.
+                    root = sp.brentq(func_part, brent_start, brent_end,
+                                     xtol=1e-5, rtol=1e-5, maxiter=200)
+
+                    #Verifies that the root found is within y_range.
+                    #If it is within 1e-6 of any other root it is discarded.
+                    #If the imaginary part is less than 1e-5 it is discarded.
+                    if (root > y_range[0] and root < y_range[-1]) \
+                    and not np.isclose(root, points, atol=1e-6).any():
+
+                        if np.imag(root) != 0 and np.imag(root) < 1e-5:
+                            root = np.real(root)
+
+                        points.append([x_loc, root])
+
+                    #If a root is not found, the method returns returns either a
+                    #RuntimeError or ValueError.
+                    #Pass to the next value of y_loc.
+                except (RuntimeError, ValueError):
+                    pass
+
+    return np.array(points)
+
+def grid_solver_spbrenth(func, x_range, y_range, axes, kwargs):
+    """
+    A different implementation of Brent's method.
+
+    Refer to grid_solver_spbrentq for comments.
+
+    Used in grid_solver. Refer to that for more comments.
+
+    Parameters
+    ----------
+        func: function
+            A function of an arbitrary number of variables.
+        x_range: array_like
+            An array defining the x-axis.
+        y_range: array_like
+            An array defining the y-axis.
+        axes: dictionary
+            Specify which axis corresponds to which variable in func.
+        kwargs: dictionary
+            Specify any other arguments of func as keys and their corresponding values.
+
+    Returns
+    -------
+        points: array_like
+            A nx2 numpy array, where n is the number of roots found.
+    """
+
+    points = []
+
+    step_size = np.abs(y_range[0]-y_range[-1])/(2*len(y_range))
+
+    for x_loc in x_range:
+
+        kwargs[axes['x_axis']] = x_loc
+        func_part = partial(func, **kwargs)
+
+        for y_loc in y_range:
+
+            y_range_local = np.linspace(y_loc-step_size, y_loc+step_size, 10000)
+            root_locs = find_sign_change(func_part, y_range_local)
+
+            for i in np.where(root_locs)[0]:
+
+                brent_start = y_range_local[i-2]
+                brent_end = y_range_local[i+2]
+
+                try:
+
+                    root = sp.brentq(func_part, brent_start, brent_end,
+                                     xtol=1e-5, rtol=1e-5, maxiter=200)
+
+                    if (root > y_range[0] and root < y_range[-1]) \
+                    and not np.isclose(root, points, atol=1e-6).any():
+
+                        if np.imag(root) != 0 and np.imag(root) < 1e-5:
+                            root = np.real(root)
+
+                        points.append([x_loc, root])
+
+                except (RuntimeError, ValueError):
+                    pass
+
+    return np.array(points)
+
+def find_sign_change(func, interval, singularity_tol=1):
     """
     Finds the points where the value of func changes sign in an assigned interval.
 
