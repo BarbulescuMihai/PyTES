@@ -12,7 +12,7 @@ y_range = np.linspace(0, 1, 1000)
 axes = {'x_axis':'kx0', 'y_axis':'vph'}
 args = {'M_A':slab.M_A}
 
-points = pytes.find_sign_change(slab.disp_rel, x_range, y_range, axes, args)
+points = pytes.grid_find_sign_change(slab.disp_rel, x_range, y_range, axes, args)
 
 ax = plt.subplot()
 
