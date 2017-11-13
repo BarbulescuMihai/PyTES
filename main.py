@@ -10,7 +10,7 @@ import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
 
-def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
+def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
     """
     Finds the roots of func in a box defined by x_range and y_range using an assigned method.
 
@@ -22,10 +22,6 @@ def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
             An array defining the x-axis.
         y_range: array_like
             An array defining the y-axis.
-        axes: dictionary
-            Specify which axis corresponds to which variable in func.
-            This must have the form {'x_axis':'var1', 'y_axis':'var2'}, where var1 and var2 are
-            arguments of func.
         kwargs: dictionary
             Specify any other arguments of func as keys and their corresponding values.
             These must be entered as {'key1':value1, 'key2':value2, etc.}
@@ -47,15 +43,15 @@ def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
 
     if method == 'sp.newton':
 
-        points = grid_solver_spnewton(func, x_range, y_range, axes, kwargs)
+        points = grid_solver_spnewton(func, x_range, y_range, kwargs)
 
     if method == 'sp.brentq':
 
-        points = grid_solver_spbrentq(func, x_range, y_range, axes, kwargs)
+        points = grid_solver_spbrentq(func, x_range, y_range, kwargs)
 
     if method == 'sp.brenth':
 
-        points = grid_solver_spbrenth(func, x_range, y_range, axes, kwargs)
+        points = grid_solver_spbrenth(func, x_range, y_range, kwargs)
 
     end_time = timeit.default_timer()
     running_time = end_time - start_time
@@ -75,7 +71,7 @@ def grid_solver(func, x_range, y_range, axes, kwargs, method='sp.newton'):
 
     return points
 
-def grid_solver_spnewton(func, x_range, y_range, axes, kwargs):
+def grid_solver_spnewton(func, x_range, y_range, kwargs):
     """
     Finds the roots of func in a box defined by x_range and y_range using Newton's method as
     defined in scipy.optimize.
@@ -90,8 +86,6 @@ def grid_solver_spnewton(func, x_range, y_range, axes, kwargs):
             An array defining the x-axis.
         y_range: array_like
             An array defining the y-axis.
-        axes: dictionary
-            Specify which axis corresponds to which variable in func.
         kwargs: dictionary
             Specify any other arguments of func as keys and their corresponding values.
 
@@ -105,11 +99,18 @@ def grid_solver_spnewton(func, x_range, y_range, axes, kwargs):
 
     for x_loc in x_range:
 
-        #Adds x_loc in kwargs and assigns it to the variable corresponding to x_axis.
+        #Creates a new dictionary corresponding to the y-axis.
         #Creates a partial function using all the extra arguments.
-        #The partial function now only depends on the variable assigned to y_axis.
-        kwargs[axes['x_axis']] = x_loc
-        func_part = partial(func, **kwargs)
+        #The partial function now only depends on the variable assigned to y-axis.
+        if 'x-axis' in kwargs:
+            x_axis = {}
+            var_name = kwargs['x-axis']
+            x_axis[var_name] = x_loc
+            del kwargs['x-axis']
+        else:
+            x_axis[var_name] = x_loc
+
+        func_part = partial(func, **x_axis, **kwargs)
 
         for y_loc in y_range:
             try:
@@ -134,7 +135,7 @@ def grid_solver_spnewton(func, x_range, y_range, axes, kwargs):
 
     return np.array(points)
 
-def grid_solver_spbrentq(func, x_range, y_range, axes, kwargs):
+def grid_solver_spbrentq(func, x_range, y_range, kwargs):
     """
     Finds the roots of func in a box defined by x_range and y_range using Brent's method as
     defined in scipy.optimize.
@@ -154,8 +155,6 @@ def grid_solver_spbrentq(func, x_range, y_range, axes, kwargs):
             An array defining the x-axis.
         y_range: array_like
             An array defining the y-axis.
-        axes: dictionary
-            Specify which axis corresponds to which variable in func.
         kwargs: dictionary
             Specify any other arguments of func as keys and their corresponding values.
 
@@ -172,11 +171,17 @@ def grid_solver_spbrentq(func, x_range, y_range, axes, kwargs):
 
     for x_loc in x_range:
 
-        #Adds x_loc in kwargs and assigns it to the variable corresponding to x_axis.
+        #Creates a new dictionary corresponding to the y-axis.
         #Creates a partial function using all the extra arguments.
-        #The partial function now only depends on the variable assigned to y_axis.
-        kwargs[axes['x_axis']] = x_loc
-        func_part = partial(func, **kwargs)
+        #The partial function now only depends on the variable assigned to y-axis.
+        if 'x-axis' in kwargs:
+            x_axis = {}
+            var_name = kwargs['x-axis']
+            x_axis[var_name] = x_loc
+            del kwargs['x-axis']
+        else:
+            x_axis[var_name] = x_loc
+        func_part = partial(func, **x_axis, **kwargs)
 
         for y_loc in y_range:
 
@@ -231,8 +236,6 @@ def grid_solver_spbrenth(func, x_range, y_range, axes, kwargs):
             An array defining the x-axis.
         y_range: array_like
             An array defining the y-axis.
-        axes: dictionary
-            Specify which axis corresponds to which variable in func.
         kwargs: dictionary
             Specify any other arguments of func as keys and their corresponding values.
 
@@ -248,8 +251,14 @@ def grid_solver_spbrenth(func, x_range, y_range, axes, kwargs):
 
     for x_loc in x_range:
 
-        kwargs[axes['x_axis']] = x_loc
-        func_part = partial(func, **kwargs)
+        if 'x-axis' in kwargs:
+            x_axis = {}
+            var_name = kwargs['x-axis']
+            x_axis[var_name] = x_loc
+            del kwargs['x-axis']
+        else:
+            x_axis[var_name] = x_loc
+        func_part = partial(func, **x_axis, **kwargs)
 
         for y_loc in y_range:
 
@@ -319,7 +328,7 @@ def find_sign_change(func, interval, singularity_tol=1):
     #chosen tolerance so as to avoid finding singularities.
     return (func_evald_prod < 0) * (np.abs(func_evald[:-1]) < singularity_tol)
 
-def grid_find_sign_change(func, x_range, y_range, axes, kwargs):
+def grid_find_sign_change(func, x_range, y_range, kwargs):
     """
     Finds the points where the value of func changes sign in a box defined by x_range and y_range.
     The purpose of this function is to find points where there might be roots of func.
@@ -333,13 +342,9 @@ def grid_find_sign_change(func, x_range, y_range, axes, kwargs):
             An array defining the x-axis.
         y_range: array_like
             An array defining the y-axis.
-        axes: dictionary
-            Specify which axis corresponds to which variable in func.
-            This must have the form {'x_axis':'var1', 'y_axis':var2}, where var1 and var2 are
-            arguments of func.
         kwargs: dictionary
             Specify any other arguments of func as keys and their corresponding values.
-            These must be entered as {'key1':value1, 'key2':value2, etc.}
+            These must be entered as {'x-axis':'var1', 'key1':var2, 'key2':var3, etc.}
 
     Returns
     -------
@@ -353,21 +358,25 @@ def grid_find_sign_change(func, x_range, y_range, axes, kwargs):
 
     x_grid, y_grid = np.meshgrid(x_range, y_range)
 
+    x_axis = {}
+
+    x_axis[kwargs['x-axis']] = x_grid
+
+    del kwargs['x-axis']
+
+#    if func(y_range[0], x_range[0], **kwargs) is None:
+#        raise TypeError("func returns None")
+
     func_part = partial(func, **kwargs)
 
-    grid_axes = {}
-
-    grid_axes[axes['y_axis']] = y_grid
-    grid_axes[axes['x_axis']] = x_grid
-
-    func_grid = func_part(**grid_axes, **kwargs)
+    func_grid = func_part(y_grid, **x_axis)
 
     grid_shift_up = func_grid[1:, :]
     grid_shift_down = func_grid[:-1, :]
     grid_prod = np.real(grid_shift_down) * np.real(grid_shift_up)
 
-    root_locs = x_grid[1:][(grid_prod < 0) * (func_grid[:-1, :] < 10)]
-    roots = y_grid[1:][(grid_prod < 0) * (func_grid[:-1, :] < 10)]
+    root_locs = x_grid[1:][(grid_prod < 0) * (np.abs(func_grid[:-1, :]) < 1)]
+    roots = y_grid[1:][(grid_prod < 0) * (np.abs(func_grid[:-1, :]) < 1)]
 
     points = np.swapaxes(np.vstack((root_locs, roots)), 1, 0)
 
@@ -401,7 +410,7 @@ def find_first_imag(func, x_range, y_range, axes, kwargs, imag_tol=1e-5):
             An array defining the y-axis.
         axes: dictionary
             Which axis corresponds to which variable in func.
-            This must have the form {'x_axis':'var1', 'y_axis':var2}, where var1 and var2 are
+            This must have the form {'x-axis':'var1', 'y-axis':var2}, where var1 and var2 are
             arguments of func.
         kwargs: dictionary
             Any other arguments of func as keys and their corresponding values.
@@ -419,7 +428,7 @@ def find_first_imag(func, x_range, y_range, axes, kwargs, imag_tol=1e-5):
 
     for x_loc in x_range:
 
-        kwargs[axes['x_axis']] = x_loc
+        kwargs[axes['x-axis']] = x_loc
         func_part = partial(func, **kwargs)
 
         for y_loc in y_range:
