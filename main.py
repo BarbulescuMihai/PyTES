@@ -1,7 +1,7 @@
 """
 Python Transcendental Equation Solvers.
 
-This version uploaded on 9 Nov 2017.
+This version uploaded on 13 Nov 2017.
 """
 
 from functools import partial
