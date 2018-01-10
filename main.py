@@ -9,6 +9,7 @@ import timeit
 import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
+import decimal
 
 def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
     """
@@ -550,7 +551,7 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
                 print('Final error when solving for x = {:.5f}, y = {}.' \
                       '\nAborting line_trace.'
                       .format(x_loc, y_loc, err))
-                return(points)
+                return points
 
         if x_error is None and x_error_loc is None:
             pass
@@ -570,7 +571,9 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         except IndexError:
             y_loc_pprev = None
 
-    points[:, 0] = np.round(points[:, 0], 6)
+    dec_places = np.abs((decimal.Decimal(str(step_size))).as_tuple().exponent)
+    points[:,0] = np.round(np.real(points[:, 0]), dec_places)
+    points[:,1][np.imag(points[:,1]) < 1e-10] = np.real(points[:,1][np.imag(points[:,1]) < 1e-10])
     return points
 
 def next_root(func, x_loc, x_loc_prev, y_loc, y_loc_prev, y_loc_pprev, step_size):
