@@ -1,7 +1,7 @@
 """
 Python Transcendental Equation Solvers.
 
-This version uploaded on 13 Nov 2017.
+This version uploaded on 9 Nov 2017.
 """
 
 from functools import partial
@@ -99,7 +99,7 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs):
 
     for x_loc in x_range:
 
-        #Creates a new dictionary corresponding to the y-axis.
+        #Creates a new dictionary corresponding to the x-axis.
         #Creates a partial function using all the extra arguments.
         #The partial function now only depends on the variable assigned to y-axis.
         if 'x-axis' in kwargs:
@@ -220,7 +220,7 @@ def grid_solver_spbrentq(func, x_range, y_range, kwargs):
 
     return np.array(points)
 
-def grid_solver_spbrenth(func, x_range, y_range, axes, kwargs):
+def grid_solver_spbrenth(func, x_range, y_range, kwargs):
     """
     A different implementation of Brent's method.
 
@@ -441,67 +441,100 @@ def find_first_imag(func, x_range, y_range, axes, kwargs, imag_tol=1e-5):
             except RuntimeError:
                 pass
 
-def next_root(func, x_loc, y_loc, step_size, arguments, points):
+def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
+               kwargs=None, wordy=True, func_mp=None, solver='newton'):
     """
     Docstring here.
     """
 
-    jump_limit = 0.1
-    iterations = 200
+    #Creates a new dictionary corresponding to the x-axis.
+    #Creates a partial function using all the extra arguments.
+    #The partial function now only depends on the variable assigned to y-axis.
+    if 'x-axis' in kwargs:
+        x_axis = {}
+        var_name = kwargs['x-axis']
+        x_axis[var_name] = x_loc
+        del kwargs['x-axis']
+    else:
+        print('x-axis undefined in kwargs')
+        return None
 
-    try:
-        grad = ((points[-1, 1] - points[-2, 1]) + (points[-1, 1] - \
-                2 * points[-2, 1] + points[-3, 1])) * \
-                np.abs(step_size/(points[-1, 0] - points[-2, 0]))
-        root = sp.newton(func, points[-1, 1] + grad + 1e-20 * 1j,
-                         args=arguments, maxiter=iterations)
-        if np.abs(root - points[-1, 1]) < jump_limit and\
-        np.abs(x_loc - points[-1, 0]) < jump_limit:
-            points = np.vstack([points, [x_loc, root]])
-        else:
-            raise ValueError('Jump of {:.5f} at x = {:.5f}, y = {:.5f}'.format(\
-                             np.abs(root-points[-1, 1]), points[-1, 0], points[-1, 1]+grad))
-        x_error = None
+    x_loc_prev = None
+    y_loc_prev = None
+    y_loc_pprev = None
 
-    except IndexError:
-        if points.all() == 0:
-            points[0,] = x_loc, sp.newton(func, y_loc, args=arguments, maxiter=iterations)
-        elif points.shape == (1, 2):
-            root = sp.newton(func, points[-1, 1], args=arguments, maxiter=iterations)
-            points = np.vstack([points, [x_loc, root]])
-        elif points.shape == (2, 2):
-            grad = ((points[-1, 1] - points[-2, 1]) * \
-                    np.abs(step_size/(points[-1, 0] - points[-2, 0])))
-            root = sp.newton(func, points[-1, 1] + grad + 1e-20 * 1j,
-                             args=arguments, maxiter=iterations)
-            if np.abs(root - points[-1, 1]) < jump_limit and\
-            np.abs(x_loc - points[-1, 0]) < jump_limit:
-                points = np.vstack([points, [x_loc, root]])
-            else:
-                raise ValueError('Jump of {:.5f} at x = {:.5f}, y = {:.5f}'
-                                 .format(np.abs(root-points[-1, 1]), points[-1, 0],
-                                         points[-1, 1]+grad))
-        x_error = None
-
-    return points, np.abs(step_size), x_error, x_loc
-
-def line_trace_sp(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
-                  args=None, wordy=True, func_mp=None, solver='halley'):
-    """
-    Docstring here.
-    """
-
-    points = np.zeros((1, 2))
     step_init = step_size
     x_error_loc = None
 
+    func_part = partial(func, **x_axis, **kwargs)
+    root = sp.newton(func_part, y_loc)
+    points = np.array([[x_loc, root]])
+
     while np.real(x_loc) >= x_end_left:
-        arguments = [x_loc if i is None else i for i in list(args)]
-        flip_func = partial(lambda *args: func_mp(*args[::-1]), *arguments[::-1])
+
+        x_loc_prev = x_loc
+        x_loc -= step_size
+
+        x_axis[var_name] = x_loc
+        func_part = partial(func, **x_axis, **kwargs)
 
         try:
-            points, step_size, x_error, x_loc = next_root(func, x_loc, y_loc, -step_size,
-                                                          tuple(arguments), points)
+            next_points, step_size, x_error = next_root(func_part, x_loc, x_loc_prev,
+                                                        y_loc, y_loc_prev, y_loc_pprev, -step_size)
+            points = np.vstack([points, next_points])
+
+        except (RuntimeError, ValueError) as err:
+            if step_size >= step_init * 2**(-5):
+                if wordy:
+                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}'
+                          .format(x_loc, y_loc, err))
+                x_loc += step_size
+                x_error, step_size = x_loc, step_size/2
+                if wordy:
+                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}\n'
+                          .format(x_loc, y_loc, err))
+            else:
+                print('Final error when solving for x = {:.5f}, y = {}.' \
+                      '\nAborting  backwards line_trace.'
+                      .format(x_loc, y_loc, err))
+                break
+
+        if x_error is None and x_error_loc is None:
+            pass
+        elif not x_error is None and x_error_loc is None:
+            x_error_loc = x_error
+        elif x_error is None and not x_error_loc is None and\
+            np.abs(x_loc) - np.abs(x_error_loc) >= 10 * step_size:
+            step_size = step_init
+        else:
+            pass
+
+        y_loc = points[-1, 1]
+        y_loc_prev = points[-2, 1]
+
+        try:
+            y_loc_pprev = points[-3, 1]
+        except IndexError:
+            y_loc_pprev = None
+
+    points = points[::-1]
+    x_loc = points[-1, 0]
+    y_loc = points[-1, 1]
+    y_loc_prev = points[-2, 1]
+    y_loc_pprev = points[-3, 1]
+
+    while np.real(x_loc) <= x_end_right:
+
+        x_loc_prev = x_loc
+        x_loc += step_size
+
+        x_axis[var_name] = x_loc
+        func_part = partial(func, **x_axis, **kwargs)
+
+        try:
+            next_points, step_size, x_error = next_root(func_part, x_loc, x_loc_prev,
+                                                        y_loc, y_loc_prev, y_loc_pprev, -step_size)
+            points = np.vstack([points, next_points])
 
         except (RuntimeError, ValueError) as err:
             if step_size >= step_init * 2**(-5):
@@ -511,11 +544,13 @@ def line_trace_sp(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
                 x_loc -= step_size
                 x_error, step_size = x_loc, step_size/2
                 if wordy:
-                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}'
+                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}\n'
                           .format(x_loc, y_loc, err))
             else:
-                points, step_size, x_error, x_loc = next_root_mp(flip_func, x_loc, y_loc, step_size,
-                                                                 points, solver, wordy)
+                print('Final error when solving for x = {:.5f}, y = {}.' \
+                      '\nAborting line_trace.'
+                      .format(x_loc, y_loc, err))
+                return(points)
 
         if x_error is None and x_error_loc is None:
             pass
@@ -527,41 +562,52 @@ def line_trace_sp(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         else:
             pass
 
-        x_loc -= step_size
-
-    points = points[::-1]
-    x_loc = points[-1, 0] + step_size
-
-    while np.real(x_loc) <= x_end_right:
-        arguments = [x_loc if i is None else i for i in list(args)]
-        flip_func = partial(lambda *args: func_mp(*args[::-1]), *arguments[::-1])
+        y_loc = points[-1, 1]
+        y_loc_prev = points[-2, 1]
 
         try:
-            points, step_size, x_error, x_loc = next_root(func, x_loc, y_loc, step_size,
-                                                          tuple(arguments), points)
-        except (RuntimeError, ValueError) as err:
-            if wordy:
-                print('Error when solving for x = {:.5f}.\n Error message:{}'
-                      .format(x_loc, err))
-            x_loc -= step_size
-            x_error, step_size = x_loc, step_size/2
-            if wordy:
-                print('Solving for x = {:.5f}, and step_size = {} instead. \n'
-                      .format(x_loc, step_size))
+            y_loc_pprev = points[-3, 1]
+        except IndexError:
+            y_loc_pprev = None
 
-        if x_error is None and x_error_loc is None:
-            pass
-        elif not x_error is None and x_error_loc is None:
-            x_error_loc = x_error
-        elif x_error is None and not x_error_loc is None and\
-            np.abs(x_loc) - np.abs(x_error_loc) >= 10 * step_size:
-            step_size = step_init
-        else:
-            pass
-
-        x_loc += step_size
-    points[:, 0] = np.round(points[:, 0], 4)
+    points[:, 0] = np.round(points[:, 0], 6)
     return points
+
+def next_root(func, x_loc, x_loc_prev, y_loc, y_loc_prev, y_loc_pprev, step_size):
+    """
+    Docstring here.
+    """
+
+    jump_limit = 0.1
+    iterations = 500
+
+    try:
+        grad = ((y_loc - y_loc_prev) + (y_loc - 2 * y_loc_prev + y_loc_pprev)) * \
+                np.abs(step_size/(x_loc - x_loc_prev))
+        root = sp.newton(func, y_loc + grad + 1e-20 * 1j, maxiter=iterations)
+        if np.abs(root - y_loc) < jump_limit:
+            next_points = np.array([[x_loc, root]])
+        else:
+            raise ValueError('Jump of {:.5f} at x = {:.5f}, y = {:.5f}'.format(\
+                             np.abs(root-y_loc), x_loc, y_loc+grad))
+        x_error = None
+
+    except TypeError:
+        if (y_loc_prev is None) and (y_loc_pprev is None):
+            root = sp.newton(func, y_loc, maxiter=iterations)
+            next_points = np.array([[x_loc, root]])
+        elif y_loc_pprev is None:
+            grad = ((y_loc - y_loc_prev) * np.abs(step_size/(x_loc - x_loc_prev)))
+            root = sp.newton(func, y_loc + grad + 1e-20 * 1j, maxiter=iterations)
+            if np.abs(root - y_loc) < jump_limit:
+                next_points = np.array([[x_loc, root]])
+            else:
+                raise ValueError('Jump of {:.5f} at x = {:.5f}, y = {:.5f}'.format(\
+                             np.abs(root-y_loc), x_loc, y_loc+grad))
+
+        x_error = None
+
+    return next_points, np.abs(step_size), x_error
 
 def next_root_mp(func, x_loc, y_loc, step_size, points,
                  solver='halley', tol=1e-15):
