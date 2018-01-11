@@ -10,6 +10,7 @@ import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
 import decimal
+import inspect
 
 def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
     """
@@ -50,10 +51,6 @@ def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
 
         points = grid_solver_spbrentq(func, x_range, y_range, kwargs)
 
-    if method == 'sp.brenth':
-
-        points = grid_solver_spbrenth(func, x_range, y_range, kwargs)
-
     end_time = timeit.default_timer()
     running_time = end_time - start_time
 
@@ -72,7 +69,7 @@ def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
 
     return points
 
-def grid_solver_spnewton(func, x_range, y_range, kwargs):
+def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-10):
     """
     Finds the roots of func in a box defined by x_range and y_range using Newton's method as
     defined in scipy.optimize.
@@ -134,9 +131,22 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs):
             except RuntimeError:
                 pass
 
-    return np.array(points)
+    points = np.array(points)
 
-def grid_solver_spbrentq(func, x_range, y_range, kwargs):
+    args = inspect.getfullargspec(func)[0]
+    if 'self' in args:
+        args.remove('self')
+
+    kwargs[var_name] = points[:,0]
+    kwargs[args[0]] = points[:,1]
+
+    vfunc = np.vectorize(func)
+    point_check = vfunc(**kwargs)
+    points = points[point_check < tol]
+
+    return points
+
+def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-10):
     """
     Finds the roots of func in a box defined by x_range and y_range using Brent's method as
     defined in scipy.optimize.
@@ -219,75 +229,20 @@ def grid_solver_spbrentq(func, x_range, y_range, kwargs):
                 except (RuntimeError, ValueError):
                     pass
 
-    return np.array(points)
+    points = np.array(points)
 
-def grid_solver_spbrenth(func, x_range, y_range, kwargs):
-    """
-    A different implementation of Brent's method.
+    args = inspect.getfullargspec(func)[0]
+    if 'self' in args:
+        args.remove('self')
 
-    Refer to grid_solver_spbrentq for comments.
+    kwargs[var_name] = points[:,0]
+    kwargs[args[0]] = points[:,1]
 
-    Used in grid_solver. Refer to that for more comments.
+    vfunc = np.vectorize(func)
+    point_check = vfunc(**kwargs)
+    points = points[point_check < tol]
 
-    Parameters
-    ----------
-        func: function
-            A function of an arbitrary number of variables.
-        x_range: array_like
-            An array defining the x-axis.
-        y_range: array_like
-            An array defining the y-axis.
-        kwargs: dictionary
-            Specify any other arguments of func as keys and their corresponding values.
-
-    Returns
-    -------
-        points: array_like
-            A nx2 numpy array, where n is the number of roots found.
-    """
-
-    points = []
-
-    step_size = np.abs(y_range[0]-y_range[-1])/(2*len(y_range))
-
-    for x_loc in x_range:
-
-        if 'x-axis' in kwargs:
-            x_axis = {}
-            var_name = kwargs['x-axis']
-            x_axis[var_name] = x_loc
-            del kwargs['x-axis']
-        else:
-            x_axis[var_name] = x_loc
-        func_part = partial(func, **x_axis, **kwargs)
-
-        for y_loc in y_range:
-
-            y_range_local = np.linspace(y_loc-step_size, y_loc+step_size, 10000)
-            root_locs = find_sign_change(func_part, y_range_local)
-
-            for i in np.where(root_locs)[0]:
-
-                brent_start = y_range_local[i-2]
-                brent_end = y_range_local[i+2]
-
-                try:
-
-                    root = sp.brentq(func_part, brent_start, brent_end,
-                                     xtol=1e-5, rtol=1e-5, maxiter=200)
-
-                    if (root > y_range[0] and root < y_range[-1]) \
-                    and not np.isclose(root, points, atol=1e-6).any():
-
-                        if np.imag(root) != 0 and np.imag(root) < 1e-5:
-                            root = np.real(root)
-
-                        points.append([x_loc, root])
-
-                except (RuntimeError, ValueError):
-                    pass
-
-    return np.array(points)
+    return points
 
 def find_sign_change(func, interval, singularity_tol=1):
     """
