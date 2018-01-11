@@ -128,8 +128,12 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-10):
 
                 #If a root is not found, the method returns returns a RuntimeError.
                 #Pass to the next value of y_loc.
-            except RuntimeError:
-                pass
+            except (RuntimeError, ZeroDivisionError) as err:
+                if type(err) == RuntimeError:
+                    pass
+                if type(err) == ZeroDivisionError:
+                    print(err)
+                    pass
 
     points = np.array(points)
 
@@ -226,8 +230,12 @@ def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-10):
                     #If a root is not found, the method returns returns either a
                     #RuntimeError or ValueError.
                     #Pass to the next value of y_loc.
-                except (RuntimeError, ValueError):
-                    pass
+                except (RuntimeError, ValueError, ZeroDivisionError) as err:
+                    if (type(err) == RuntimeError) or (type(err) == ValueError):
+                        pass
+                    if type(err) == ZeroDivisionError:
+                        print(err)
+                        pass
 
     points = np.array(points)
 
