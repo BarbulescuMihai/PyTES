@@ -6,10 +6,10 @@ This version uploaded on 9 Nov 2017.
 
 from functools import partial
 import timeit
+import inspect
 import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
-import inspect
 
 def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
     """
@@ -68,7 +68,7 @@ def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
 
     return points
 
-def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-10):
+def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-3):
     """
     Finds the roots of func in a box defined by x_range and y_range using Newton's method as
     defined in scipy.optimize.
@@ -128,20 +128,19 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-10):
                 #If a root is not found, the method returns returns a RuntimeError.
                 #Pass to the next value of y_loc.
             except (RuntimeError, ZeroDivisionError) as err:
-                if type(err) == RuntimeError:
+                if isinstance(err, RuntimeError):
                     pass
-                if type(err) == ZeroDivisionError:
+                if isinstance(err, ZeroDivisionError):
                     print(err)
-                    pass
 
     points = np.array(points)
 
-    args = inspect.getfullargspec(func)[0]
-    if 'self' in args:
-        args.remove('self')
+    argspec = inspect.getfullargspec(func)[0]
+    if 'self' in argspec:
+        argspec.remove('self')
 
-    kwargs[var_name] = points[:,0]
-    kwargs[args[0]] = points[:,1]
+    kwargs[var_name] = points[:, 0]
+    kwargs[argspec[0]] = points[:, 1]
 
     vfunc = np.vectorize(func)
     point_check = vfunc(**kwargs)
@@ -149,7 +148,7 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-10):
 
     return points
 
-def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-10):
+def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-3):
     """
     Finds the roots of func in a box defined by x_range and y_range using Brent's method as
     defined in scipy.optimize.
@@ -230,20 +229,19 @@ def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-10):
                     #RuntimeError or ValueError.
                     #Pass to the next value of y_loc.
                 except (RuntimeError, ValueError, ZeroDivisionError) as err:
-                    if (type(err) == RuntimeError) or (type(err) == ValueError):
+                    if isinstance(err, (RuntimeError, ValueError)):
                         pass
-                    if type(err) == ZeroDivisionError:
+                    if isinstance(err, ZeroDivisionError):
                         print(err)
-                        pass
 
     points = np.array(points)
 
-    args = inspect.getfullargspec(func)[0]
-    if 'self' in args:
-        args.remove('self')
+    argspec = inspect.getfullargspec(func)[0]
+    if 'self' in argspec:
+        argspec.remove('self')
 
-    kwargs[var_name] = points[:,0]
-    kwargs[args[0]] = points[:,1]
+    kwargs[var_name] = points[:, 0]
+    kwargs[argspec[0]] = points[:, 1]
 
     vfunc = np.vectorize(func)
     point_check = vfunc(**kwargs)
@@ -327,9 +325,6 @@ def grid_find_sign_change(func, x_range, y_range, kwargs):
 
     del kwargs['x-axis']
 
-#    if func(y_range[0], x_range[0], **kwargs) is None:
-#        raise TypeError("func returns None")
-
     func_part = partial(func, **kwargs)
 
     func_grid = func_part(y_grid, **x_axis)
@@ -405,8 +400,8 @@ def find_first_imag(func, x_range, y_range, axes, kwargs, imag_tol=1e-5):
                 pass
 
 def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
-               kwargs=None, x_log=False, end_points=False, wordy=True,
-               func_mp=None, solver='newton'):
+               kwargs=None, x_log=False, end_points=False,
+               func_mp=None, tol=1e-3):
     """
     Docstring here.
     """
@@ -435,8 +430,14 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         x_end_right -= step_init
 
     func_part = partial(func, **x_axis, **kwargs)
-    root = sp.newton(func_part, y_loc)
+    root = sp.newton(func_part, y_loc, maxiter=1000)
     points = np.array([[x_loc, root]])
+
+    kwargs_check = kwargs.copy()
+
+    argspec = inspect.getfullargspec(func)[0]
+    if 'self' in argspec:
+        argspec.remove('self')
 
     while np.real(x_loc) > x_end_left:
 
@@ -446,27 +447,38 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         x_loc -= step_size
 
         x_axis[var_name] = x_loc
+
         func_part = partial(func, **x_axis, **kwargs)
 
         try:
             next_points, step_size, x_error = next_root(func_part, x_loc, x_loc_prev,
                                                         y_loc, y_loc_prev, y_loc_pprev, -step_size)
-            points = np.vstack([points, next_points])
+
+            kwargs_check[var_name] = next_points[0, 0]
+            kwargs_check[argspec[0]] = next_points[0, 1]
+
+            point_check = func(**kwargs_check)
+
+            if point_check < tol:
+                points = np.vstack([points, next_points])
+            else:
+                print('Spurious root found when solving for x = {:.5f}, y = {}.\n'
+                      .format(x_loc, y_loc),
+                      'Aborting backward line_trace.')
+                break
 
         except (RuntimeError, ValueError) as err:
             if step_size >= step_init * 2**(-5):
-                if wordy:
-                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}'
-                          .format(x_loc, y_loc, err))
+                print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}'
+                      .format(x_loc, y_loc, err))
                 x_loc += step_size
                 x_error, step_size = x_loc, step_size/2
-                if wordy:
-                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}\n'
-                          .format(x_loc, y_loc, err))
+                print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}\n'
+                      .format(x_loc, y_loc, err))
             else:
                 print('Final error when solving for x = {:.5f}, y = {}.' \
                       '\nAborting  backwards line_trace.'
-                      .format(x_loc, y_loc, err))
+                      .format(x_loc, y_loc))
                 break
 
         if x_error is None and x_error_loc is None:
@@ -506,22 +518,32 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         try:
             next_points, step_size, x_error = next_root(func_part, x_loc, x_loc_prev,
                                                         y_loc, y_loc_prev, y_loc_pprev, -step_size)
-            points = np.vstack([points, next_points])
+
+            kwargs_check[var_name] = next_points[0, 0]
+            kwargs_check[argspec[0]] = next_points[0, 1]
+
+            point_check = func(**kwargs_check)
+
+            if point_check < tol:
+                points = np.vstack([points, next_points])
+            else:
+                print('Spurious root found when solving for x = {:.5f}, y = {}.\n'
+                      .format(x_loc, y_loc),
+                      'Aborting forward line_trace.')
+                break
 
         except (RuntimeError, ValueError) as err:
             if step_size >= step_init * 2**(-5):
-                if wordy:
-                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}'
-                          .format(x_loc, y_loc, err))
+                print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}'
+                      .format(x_loc, y_loc, err))
                 x_loc -= step_size
                 x_error, step_size = x_loc, step_size/2
-                if wordy:
-                    print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}\n'
-                          .format(x_loc, y_loc, err))
+                print('Error when solving for x = {:.5f}, y = {}.\n Error message:{}\n'
+                      .format(x_loc, y_loc, err))
             else:
                 print('Final error when solving for x = {:.5f}, y = {}.' \
-                      '\nAborting line_trace.'
-                      .format(x_loc, y_loc, err))
+                      '\nAborting forward line_trace.'
+                      .format(x_loc, y_loc))
                 return points
 
         if x_error is None and x_error_loc is None:
@@ -542,7 +564,8 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         except IndexError:
             y_loc_pprev = None
 
-    points[:,1][np.imag(points[:,1]) < 1e-10] = np.real(points[:,1][np.imag(points[:,1]) < 1e-10])
+    points[:, 1][np.imag(points[:, 1]) < 1e-10] = \
+    np.real(points[:, 1][np.imag(points[:, 1]) < 1e-10])
     return points
 
 def next_root(func, x_loc, x_loc_prev, y_loc, y_loc_prev, y_loc_pprev, step_size):
@@ -588,7 +611,7 @@ def next_root_mp(func, x_loc, y_loc, step_size, points,
     """
 
     jump_limit = 0.1
-    maxsteps = 200
+    maxsteps = 500
 
     try:
         grad = (
