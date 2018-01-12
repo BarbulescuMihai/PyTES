@@ -9,7 +9,6 @@ import timeit
 import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
-import decimal
 import inspect
 
 def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
@@ -406,7 +405,8 @@ def find_first_imag(func, x_range, y_range, axes, kwargs, imag_tol=1e-5):
                 pass
 
 def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
-               kwargs=None, wordy=True, func_mp=None, solver='newton'):
+               kwargs=None, x_log=False, end_points=False, wordy=True,
+               func_mp=None, solver='newton'):
     """
     Docstring here.
     """
@@ -430,13 +430,19 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
     step_init = step_size
     x_error_loc = None
 
+    if end_points is False:
+        x_end_left += step_init
+        x_end_right -= step_init
+
     func_part = partial(func, **x_axis, **kwargs)
     root = sp.newton(func_part, y_loc)
     points = np.array([[x_loc, root]])
 
-    while np.real(x_loc) >= x_end_left:
+    while np.real(x_loc) > x_end_left:
 
         x_loc_prev = x_loc
+        if x_log is True:
+            step_size = step_init * 10**int(np.log10(x_loc_prev))
         x_loc -= step_size
 
         x_axis[var_name] = x_loc
@@ -487,9 +493,11 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
     y_loc_prev = points[-2, 1]
     y_loc_pprev = points[-3, 1]
 
-    while np.real(x_loc) <= x_end_right:
+    while np.real(x_loc) < x_end_right:
 
         x_loc_prev = x_loc
+        if x_log is True:
+            step_size = step_init * 10**int(np.log10(x_loc_prev))
         x_loc += step_size
 
         x_axis[var_name] = x_loc
@@ -534,8 +542,6 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         except IndexError:
             y_loc_pprev = None
 
-    dec_places = np.abs((decimal.Decimal(str(step_size))).as_tuple().exponent)
-    points[:,0] = np.round(np.real(points[:, 0]), dec_places)
     points[:,1][np.imag(points[:,1]) < 1e-10] = np.real(points[:,1][np.imag(points[:,1]) < 1e-10])
     return points
 
