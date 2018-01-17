@@ -118,7 +118,7 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-3):
                 #If it is within 1e-6 of any other root it is discarded.
                 #If the imaginary part is less than 1e-5 it is discarded.
                 if (root > y_range[0] and root < y_range[-1]) \
-                and not np.isclose(root, points, atol=1e-6).any():
+                and not np.isclose(np.real(root), np.real(points), atol=1e-6).any():
 
                     if np.imag(root) != 0 and np.imag(root) < 1e-5:
                         root = np.real(root)
@@ -218,7 +218,7 @@ def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-3):
                     #If it is within 1e-6 of any other root it is discarded.
                     #If the imaginary part is less than 1e-5 it is discarded.
                     if (root > y_range[0] and root < y_range[-1]) \
-                    and not np.isclose(root, points, atol=1e-6).any():
+                    and not np.isclose(np.real(root), np.real(points), atol=1e-6).any():
 
                         if np.imag(root) != 0 and np.imag(root) < 1e-5:
                             root = np.real(root)
