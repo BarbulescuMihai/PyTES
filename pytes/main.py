@@ -1,15 +1,17 @@
 """
 Python Transcendental Equation Solvers.
-
-This version uploaded on 9 Nov 2017.
 """
 
 from functools import partial
+from copy import deepcopy
 import timeit
 import inspect
 import numpy as np
 import scipy.optimize as sp
 import mpmath as mp
+
+__all__ = ['grid_solver', 'find_sign_change', 'grid_find_sign_change', 'find_first_imag',
+           'line_trace']
 
 def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
     """
@@ -37,18 +39,18 @@ def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
             The entries in column 0 are points on the x-axis.
             The entries in column 1 are points on the y-axis.
     """
+    start_time = timeit.default_timer()
 
     points = []
-
-    start_time = timeit.default_timer()
+    kwargs_copy = deepcopy(kwargs)
 
     if method == 'sp.newton':
 
-        points = grid_solver_spnewton(func, x_range, y_range, kwargs)
+        points = _grid_solver_spnewton(func, x_range, y_range, kwargs_copy)
 
     if method == 'sp.brentq':
 
-        points = grid_solver_spbrentq(func, x_range, y_range, kwargs)
+        points = _grid_solver_spbrentq(func, x_range, y_range, kwargs_copy)
 
     end_time = timeit.default_timer()
     running_time = end_time - start_time
@@ -68,7 +70,7 @@ def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
 
     return points
 
-def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-3):
+def _grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-3):
     """
     Finds the roots of func in a box defined by x_range and y_range using Newton's method as
     defined in scipy.optimize.
@@ -116,11 +118,11 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-3):
 
                 #Verifies that the root found is within y_range.
                 #If it is within 1e-6 of any other root it is discarded.
-                #If the imaginary part is less than 1e-5 it is discarded.
+                #If the abs of the imaginary part is less than 1e-5 it is discarded.
                 if (root > y_range[0] and root < y_range[-1]) \
                 and not np.isclose(np.real(root), np.real(points), atol=1e-6).any():
 
-                    if np.imag(root) != 0 and np.imag(root) < 1e-5:
+                    if np.imag(root) != 0 and np.abs(np.imag(root)) < 1e-10:
                         root = np.real(root)
 
                     points.append([x_loc, root])
@@ -148,7 +150,7 @@ def grid_solver_spnewton(func, x_range, y_range, kwargs, tol=1e-3):
 
     return points
 
-def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-3):
+def _grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-3):
     """
     Finds the roots of func in a box defined by x_range and y_range using Brent's method as
     defined in scipy.optimize.
@@ -220,7 +222,7 @@ def grid_solver_spbrentq(func, x_range, y_range, kwargs, tol=1e-3):
                     if (root > y_range[0] and root < y_range[-1]) \
                     and not np.isclose(np.real(root), np.real(points), atol=1e-6).any():
 
-                        if np.imag(root) != 0 and np.imag(root) < 1e-5:
+                        if np.imag(root) != 0 and np.abs(np.imag(root)) < 1e-10:
                             root = np.real(root)
 
                         points.append([x_loc, root])
@@ -317,15 +319,17 @@ def grid_find_sign_change(func, x_range, y_range, kwargs):
 
     start_time = timeit.default_timer()
 
+    kwargs_copy = deepcopy(kwargs)
+
     x_grid, y_grid = np.meshgrid(x_range, y_range)
 
     x_axis = {}
 
-    x_axis[kwargs['x-axis']] = x_grid
+    x_axis[kwargs_copy['x-axis']] = x_grid
 
-    del kwargs['x-axis']
+    del kwargs_copy['x-axis']
 
-    func_part = partial(func, **kwargs)
+    func_part = partial(func, **kwargs_copy)
 
     func_grid = func_part(y_grid, **x_axis)
 
@@ -384,16 +388,18 @@ def find_first_imag(func, x_range, y_range, axes, kwargs, imag_tol=1e-5):
             The entry in column 1 is the location on the y-axis.
     """
 
+    kwargs_copy = deepcopy(kwargs)
+
     for x_loc in x_range:
 
-        kwargs[axes['x-axis']] = x_loc
-        func_part = partial(func, **kwargs)
+        kwargs_copy[axes['x-axis']] = x_loc
+        func_part = partial(func, **kwargs_copy)
 
         for y_loc in y_range:
 
             try:
                 root = sp.newton(func_part, y_loc, tol=1e-20)
-                if (root > y_range[0] and root < y_range[-1]) and np.imag(root) > imag_tol:
+                if (root > y_range[0] and root < y_range[-1]) and np.abs(np.imag(root)) > imag_tol:
                     return np.array([x_loc, root])
 
             except RuntimeError:
@@ -406,14 +412,16 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
     Docstring here.
     """
 
+    kwargs_copy = deepcopy(kwargs)
+
     #Creates a new dictionary corresponding to the x-axis.
     #Creates a partial function using all the extra arguments.
     #The partial function now only depends on the variable assigned to y-axis.
-    if 'x-axis' in kwargs:
+    if 'x-axis' in kwargs_copy:
         x_axis = {}
-        var_name = kwargs['x-axis']
+        var_name = kwargs_copy['x-axis']
         x_axis[var_name] = x_loc
-        del kwargs['x-axis']
+        del kwargs_copy['x-axis']
     else:
         print('x-axis undefined in kwargs')
         return None
@@ -429,11 +437,11 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         x_end_left += step_init
         x_end_right -= step_init
 
-    func_part = partial(func, **x_axis, **kwargs)
+    func_part = partial(func, **x_axis, **kwargs_copy)
     root = sp.newton(func_part, y_loc, maxiter=1000)
     points = np.array([[x_loc, root]])
 
-    kwargs_check = kwargs.copy()
+    kwargs_check = deepcopy(kwargs_copy)
 
     argspec = inspect.getfullargspec(func)[0]
     if 'self' in argspec:
@@ -448,10 +456,10 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
 
         x_axis[var_name] = x_loc
 
-        func_part = partial(func, **x_axis, **kwargs)
+        func_part = partial(func, **x_axis, **kwargs_copy)
 
         try:
-            next_points, step_size, x_error = next_root(func_part, x_loc, x_loc_prev,
+            next_points, step_size, x_error = _next_root(func_part, x_loc, x_loc_prev,
                                                         y_loc, y_loc_prev, y_loc_pprev, -step_size)
 
             kwargs_check[var_name] = next_points[0, 0]
@@ -513,10 +521,10 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         x_loc += step_size
 
         x_axis[var_name] = x_loc
-        func_part = partial(func, **x_axis, **kwargs)
+        func_part = partial(func, **x_axis, **kwargs_copy)
 
         try:
-            next_points, step_size, x_error = next_root(func_part, x_loc, x_loc_prev,
+            next_points, step_size, x_error = _next_root(func_part, x_loc, x_loc_prev,
                                                         y_loc, y_loc_prev, y_loc_pprev, -step_size)
 
             kwargs_check[var_name] = next_points[0, 0]
@@ -564,11 +572,11 @@ def line_trace(func, x_loc, y_loc, step_size, x_end_left, x_end_right,
         except IndexError:
             y_loc_pprev = None
 
-    points[:, 1][np.imag(points[:, 1]) < 1e-10] = \
-    np.real(points[:, 1][np.imag(points[:, 1]) < 1e-10])
+    points[:, 1][np.abs(np.imag(points[:, 1])) < 1e-10] = \
+    np.real(points[:, 1][np.abs(np.imag(points[:, 1])) < 1e-10])
     return points
 
-def next_root(func, x_loc, x_loc_prev, y_loc, y_loc_prev, y_loc_pprev, step_size):
+def _next_root(func, x_loc, x_loc_prev, y_loc, y_loc_prev, y_loc_pprev, step_size):
     """
     Docstring here.
     """
@@ -604,7 +612,7 @@ def next_root(func, x_loc, x_loc_prev, y_loc, y_loc_prev, y_loc_pprev, step_size
 
     return next_points, np.abs(step_size), x_error
 
-def next_root_mp(func, x_loc, y_loc, step_size, points,
+def _next_root_mp(func, x_loc, y_loc, step_size, points,
                  solver='halley', tol=1e-15):
     """
     Docstring here.
