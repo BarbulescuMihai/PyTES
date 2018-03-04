@@ -2,7 +2,7 @@
 Test equation.
 """
 
-import main as pytes
+import pytes
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,6 +10,7 @@ import matplotlib.gridspec as gridspec
 from scipy.special import kn
 
 #We define a function of two variables.
+#The variable to be plotted on the y-axis must always be first.
 def equation(y,x):
     return y*kn(0, x) + x*kn(0, y) - x
 
