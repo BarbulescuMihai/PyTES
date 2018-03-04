@@ -56,6 +56,7 @@ class Asymmetric_magnetic_slab:
         return sc.sqrt( (self.v_A2**2 - (c_ph - M_A2)**2) * (self.c2**2 - (c_ph - M_A2)**2 ) /
                        ((self.c2**2 + self.v_A2**2) * (self.c_T2**2 - (c_ph - M_A2)**2) ) )
 
+    #function to be solved
     def disp_rel(self, c_ph, kx0, v_A1, v_A2, M_A0, M_A1, M_A2):
         return (1 - (c_ph - M_A0)**2 )**2 + \
             self.m0(c_ph, M_A0)**2 * self.R1 * self.R2 / (self.m1(c_ph, M_A1) * self.m2(c_ph, M_A2)) * \
