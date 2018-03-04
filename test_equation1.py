@@ -2,7 +2,7 @@
 Test equation 1.
 """
 
-import main as pytes
+import pytes
 
 import numpy as np
 import matplotlib.pyplot as plt
