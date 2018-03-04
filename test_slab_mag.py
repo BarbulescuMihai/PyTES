@@ -4,7 +4,7 @@ Created on Wed Nov 8 16:40:12 2017
 @author: Mihai
 """
 
-import main as pytes
+import pytes
 from test_class_slab_magnetic import Asymmetric_magnetic_slab
 
 import numpy as np
