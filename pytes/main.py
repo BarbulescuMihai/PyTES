@@ -30,7 +30,7 @@ def grid_solver(func, x_range, y_range, kwargs, method='sp.newton'):
             These must be entered as {'key1':value1, 'key2':value2, etc.}
         method: string
             Specify which solver should be used to find the points.
-            Currently supported: sp.newton, sp.brentq, sp.brenth.
+            Currently supported: sp.newton, sp.brentq.
 
     Returns
     -------
